@@ -25,8 +25,8 @@ DB.init().then(boot);
 
 // Shared helpers: formulas ($...$ via KaTeX), answer checking, labels
 function rich(t){if(!t)return '';const d=h('span',{style:'white-space:pre-wrap'});
-t.split(/(\$\$[^$]+\$\$|\$[^$\n]+\$)/).forEach(p=>{const m=p.match(/^\$\$([^$]+)\$\$$|^\$([^$\n]+)\$$/);
-if(m&&window.katex){const s=h('span');try{s.innerHTML=katex.renderToString(m[1]||m[2],{throwOnError:false,displayMode:!!m[1]})}catch(e){s.textContent=p}d.append(s)}else d.append(p)});return d}
+t.split(/(\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$\$[\s\S]+?\$\$|\$[^$\n]+\$)/).forEach(p=>{const m=p.match(/^\\\[([\s\S]+)\\\]$|^\\\(([\s\S]+)\\\)$|^\$\$([\s\S]+)\$\$$|^\$([^$\n]+)\$$/);
+if(m&&window.katex){const e=m[1]||m[2]||m[3]||m[4],s=h('span');try{s.innerHTML=katex.renderToString(e,{throwOnError:false,displayMode:!!(m[1]||m[3])})}catch(x){s.textContent=p}d.append(s)}else d.append(p)});return d}
 const TYPES={mcq:'MCQ (one correct)',multi:'Multiple correct',num:'Numerical answer',tf:'True / False'};
 const isAns=a=>a!==null&&a!==undefined&&a!==''&&!(Array.isArray(a)&&!a.length);
 function right(q,a){if(!isAns(a))return false;if(q.type==='multi')return Array.isArray(a)&&JSON.stringify([...a].sort())===JSON.stringify([...q.ans].sort());
