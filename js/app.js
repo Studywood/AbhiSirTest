@@ -6,7 +6,7 @@ let timer=null;
 function shell(title,cls,body){clearInterval(timer);const s=Session.get();
 $('#app').replaceChildren(h('header',{class:cls},h('b',{},title),h('span',{},s.name),h('button',{class:'alt',onclick:()=>{Session.clear();boot()}},'Log out')),body)}
 function boot(){const s=Session.get();if(s)return s.role==='admin'?adminView():studentView();loginView()}
-function loginView(up){const msg=h('p',{class:'err'}),name=h('input',{placeholder:'Full name',autocomplete:'name'});
+function loginView(up){const T=h('h1',{},'Abhi Sir Classes'),LG=h('div');PUB.get('settings','main').then(s=>{if(!s)return;if(s.name)T.textContent=s.name;if(s.logo)LG.append(h('img',{src:s.logo,style:'height:72px;border-radius:16px'}))});const msg=h('p',{class:'err'}),name=h('input',{placeholder:'Full name',autocomplete:'name'});
 const u=h('input',{placeholder:'Username',autocomplete:'username',required:true,value:up?'':localStorage.getItem('rememberUser')||''});
 const p=h('input',{type:'password',placeholder:up?'Choose a password (6+ characters)':'Password',autocomplete:up?'new-password':'current-password',required:true});
 const rm=h('input',{type:'checkbox'});rm.checked=!!localStorage.getItem('rememberUser');
@@ -20,5 +20,16 @@ if(await login(u.value,p.value))done();else msg.textContent='Wrong username or p
 h('h2',{},up?'Create student account':'Log in'),up?name:'',u,p,h('label',{},show,' Show password'),h('br'),h('label',{},rm,' Remember my username'),msg,h('button',{type:'submit'},up?'Sign up':'Log in'),' ',
 h('button',{type:'button',class:'alt',onclick:()=>loginView(!up)},up?'I have an account':'New student? Sign up'),
 h('p',{class:'muted'},'Forgot your password? Ask Abhi Sir to reset it.'));
-$('#app').replaceChildren(h('main',{style:'max-width:420px;margin-top:8vh'},h('h1',{},'Abhi Sir Classes'),h('p',{class:'muted'},'Mock tests, quizzes, question papers and worked solutions.'),h('div',{class:'card'},f)))}
+$('#app').replaceChildren(h('main',{style:'max-width:420px;margin-top:8vh'},LG,T,h('p',{class:'muted'},'Mock tests, quizzes, question papers and worked solutions.'),h('div',{class:'card'},f)))}
 DB.init().then(boot);
+
+// Shared helpers: formulas ($...$ via KaTeX), answer checking, labels
+function rich(t){if(!t)return '';const d=h('span',{style:'white-space:pre-wrap'});
+t.split(/(\$\$[^$]+\$\$|\$[^$\n]+\$)/).forEach(p=>{const m=p.match(/^\$\$([^$]+)\$\$$|^\$([^$\n]+)\$$/);
+if(m&&window.katex){const s=h('span');try{s.innerHTML=katex.renderToString(m[1]||m[2],{throwOnError:false,displayMode:!!m[1]})}catch(e){s.textContent=p}d.append(s)}else d.append(p)});return d}
+const TYPES={mcq:'MCQ (one correct)',multi:'Multiple correct',num:'Numerical answer',tf:'True / False'};
+const isAns=a=>a!==null&&a!==undefined&&a!==''&&!(Array.isArray(a)&&!a.length);
+function right(q,a){if(!isAns(a))return false;if(q.type==='multi')return Array.isArray(a)&&JSON.stringify([...a].sort())===JSON.stringify([...q.ans].sort());
+if(q.type==='num'){const x=parseFloat(a),y=parseFloat(q.ans);return !isNaN(x)&&Math.abs(x-y)<=(+q.tol||0)+1e-9}return a===q.ans}
+const corTxt=q=>q.type==='multi'?q.ans.map(i=>'ABCD'[i]).join(', '):q.type==='num'?String(q.ans)+(q.tol?' ± '+q.tol:''):q.type==='tf'?['True','False'][q.ans]:'ABCD'[q.ans];
+const lab=(q,i)=>q.type==='tf'?'':'ABCD'[i]+'. ';
