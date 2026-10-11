@@ -1,6 +1,6 @@
-let AF=null,AT=null,ATab='lib',FLASH='',EDIT=null;
+let AF=null,AT=null,ATab='lib',FLASH='',EDIT=null,MOVE=null;
 async function adminView(){const root=h('main');
-root.append(h('div',{class:'tabs'},...[['lib','Library'],['stu','Students'],['set','Site'],['pub','Publish']].map(([k,l])=>h('button',{class:ATab===k?'on':'',onclick:()=>{ATab=k;AT=null;EDIT=null;adminView()}},l))));
+root.append(h('div',{class:'tabs'},...[['lib','Library'],['stu','Students'],['set','Site'],['pub','Publish']].map(([k,l])=>h('button',{class:ATab===k?'on':'',onclick:()=>{ATab=k;AT=null;EDIT=null;MOVE=null;adminView()}},l))));
 if(localStorage.dirty&&ATab!=='pub')root.append(h('div',{class:'card row'},h('span',{class:'grow'},'You have unpublished changes.'),h('button',{onclick:()=>{ATab='pub';AT=null;adminView()}},'Publish')));
 root.append(AT?await testEditor():ATab==='lib'?await library():ATab==='stu'?await students():ATab==='set'?await siteTab():await publishTab());shell('Admin panel','adm',root)}
 async function delTest(id){for(const q of await DB.all('questions'))if(q.test===id)await DB.del('questions',q.id);await DB.del('tests',id)}
@@ -12,18 +12,19 @@ return{f,el:h('div',{},h('label',{},label),f,cur?h('div',{class:'muted'},'Curren
 async function library(){const [fs,ts,ps]=await Promise.all(['folders','tests','papers'].map(s=>DB.all(s)));const box=h('div');
 const trail=[];let c=AF;while(c){const f=fs.find(x=>x.id===c);if(!f)break;trail.unshift(f);c=f.parent}
 box.append(h('div',{class:'row'},h('button',{class:'alt',onclick:()=>{AF=null;adminView()}},'All classes'),...trail.map(f=>h('button',{class:'alt',onclick:()=>{AF=f.id;adminView()}},f.name))));
+if(MOVE)box.append(movePicker(fs,ts,ps));
 const nm=h('input',{placeholder:AF?'New sub-folder (e.g. CBSE, Physics, Chapter 1)':'New folder (e.g. Class 10)'});
 box.append(h('div',{class:'card row'},h('div',{class:'grow'},nm),h('button',{onclick:async()=>{if(nm.value.trim()){await DB.put('folders',{name:nm.value.trim(),parent:AF});adminView()}}},'Create folder')));
-fs.filter(f=>(f.parent||null)===AF).forEach(f=>box.append(h('div',{class:'card row'},h('b',{class:'grow'},'📁 '+f.name),h('button',{onclick:()=>{AF=f.id;adminView()}},'Open'),h('button',{class:'del',onclick:()=>ask('Delete folder and everything inside?',()=>delFolder(f.id))},'Delete'))));
+fs.filter(f=>(f.parent||null)===AF).forEach(f=>box.append(h('div',{class:'card row'},h('b',{class:'grow'},'📁 '+f.name),h('button',{onclick:()=>{AF=f.id;adminView()}},'Open'),h('button',{class:'alt',onclick:()=>{MOVE={k:'f',id:f.id};adminView();scrollTo(0,0)}},'Move'),h('button',{class:'del',onclick:()=>ask('Delete folder and everything inside?',()=>delFolder(f.id))},'Delete'))));
 if(!AF)return box;
-ts.filter(t=>t.folder===AF).forEach(t=>box.append(h('div',{class:'card row'},h('div',{class:'grow'},h('b',{},t.title),h('div',{class:'muted'},(t.kind==='quiz'?'Quiz':t.mins+' min mock test')+', +'+t.pos+' / -'+t.neg+(t.start?' · opens '+new Date(t.start).toLocaleString():''))),h('button',{onclick:()=>{AT=t.id;adminView()}},'Add / edit questions'),h('button',{class:'del',onclick:()=>ask('Delete this test?',()=>delTest(t.id))},'Delete'))));
+ts.filter(t=>t.folder===AF).forEach(t=>box.append(h('div',{class:'card row'},h('div',{class:'grow'},h('b',{},t.title),h('div',{class:'muted'},(t.kind==='quiz'?'Quiz':t.mins+' min mock test')+', +'+t.pos+' / -'+t.neg+(t.start?' · opens '+new Date(t.start).toLocaleString():''))),h('button',{onclick:()=>{AT=t.id;adminView()}},'Add / edit questions'),h('button',{class:'alt',onclick:()=>{MOVE={k:'t',id:t.id};adminView();scrollTo(0,0)}},'Move'),h('button',{class:'del',onclick:()=>ask('Delete this test?',()=>delTest(t.id))},'Delete'))));
 const ti=h('input',{placeholder:'Title (e.g. JEE Mock 1)'}),kd=h('select',{},h('option',{value:'mock'},'Mock test (timed, like JEE): result at the end'),h('option',{value:'quiz'},'Quiz: instant answer after each question')),
 mi=h('input',{type:'number',placeholder:'Minutes',value:180}),pi=h('input',{type:'number',placeholder:'Marks per correct',value:4}),ni=h('input',{type:'number',placeholder:'Negative marks',value:1}),
 st=h('input',{type:'datetime-local'}),ins=h('textarea',{rows:3,placeholder:'Instructions shown before the test starts (optional)'}),shf=h('input',{type:'checkbox'});
 box.append(h('div',{class:'card'},h('h3',{},'Step 1: create a mock test or quiz (you add the questions next)'),ti,kd,h('label',{},'Time in minutes, marks for a correct answer, marks lost for a wrong answer'),h('div',{class:'row'},mi,pi,ni),
 h('label',{},'Opens on (optional; leave empty to open now)'),st,ins,h('label',{},shf,' Shuffle question order for each student'),h('br'),
 h('button',{onclick:async()=>{if(!ti.value.trim())return alert('Type a title first.');AT=(await DB.put('tests',{folder:AF,kind:kd.value,title:ti.value.trim(),mins:kd.value==='quiz'?0:+mi.value||60,pos:+pi.value,neg:+ni.value,start:st.value?Date.parse(st.value):0,instr:ins.value.trim(),shuffle:shf.checked})).id;adminView()}},'Create and add questions')));
-ps.filter(p=>p.folder===AF).forEach(p=>box.append(h('div',{class:'card row'},h('span',{class:'grow'},'📄 '+p.title),h('button',{class:'del',onclick:()=>ask('Delete paper?',()=>DB.del('papers',p.id))},'Delete'))));
+ps.filter(p=>p.folder===AF).forEach(p=>box.append(h('div',{class:'card row'},h('span',{class:'grow'},'📄 '+p.title),h('button',{class:'alt',onclick:()=>{MOVE={k:'p',id:p.id};adminView();scrollTo(0,0)}},'Move'),h('button',{class:'del',onclick:()=>ask('Delete paper?',()=>DB.del('papers',p.id))},'Delete'))));
 const pt=h('input',{placeholder:'Question paper title'}),pf=h('input',{type:'file',accept:'application/pdf,image/*'});
 box.append(h('div',{class:'card'},h('h3',{},'Publish question paper (PDF or image)'),pt,pf,h('button',{onclick:async()=>{if(pt.value.trim()&&pf.files[0]){await DB.put('papers',{folder:AF,title:pt.value.trim(),file:await fb(pf)});adminView()}}},'Publish')));
 return box}
@@ -83,3 +84,12 @@ box.append(h('div',{class:'card'},h('h3',{},'Institute details'),nm,tg,wa,lg.el,
 const nt=h('textarea',{rows:2,placeholder:'Write an announcement'});
 box.append(h('div',{class:'card'},h('h3',{},'Notice board'),nt,h('button',{onclick:async()=>{if(!nt.value.trim())return;await DB.put('settings',{...s,id:'main',notices:[{id:uid(),text:nt.value.trim(),at:Date.now()},...(s.notices||[])]});adminView()}},'Post notice')));
 (s.notices||[]).forEach(n=>box.append(h('div',{class:'card row'},h('span',{class:'grow'},n.text,h('div',{class:'muted'},new Date(n.at).toLocaleString())),h('button',{class:'del',onclick:()=>ask('Delete this notice?',()=>DB.put('settings',{...s,id:'main',notices:s.notices.filter(x=>x.id!==n.id)}))},'Delete'))));return box}
+
+function movePicker(fs,ts,ps){const m=MOVE,item=(m.k==='f'?fs:m.k==='t'?ts:ps).find(x=>x.id===m.id)||{},store={f:'folders',t:'tests',p:'papers'}[m.k];
+const path=id=>{const n=[];let c=id;while(c){const f=fs.find(x=>x.id===c);if(!f)break;n.unshift(f.name);c=f.parent}return n.join(' › ')};
+const bad=new Set();if(m.k==='f'){const add=id=>{bad.add(id);fs.filter(x=>x.parent===id).forEach(x=>add(x.id))};add(m.id)}
+const opts=fs.filter(f=>!bad.has(f.id)).map(f=>({id:f.id,p:path(f.id)})).sort((a,b)=>a.p.localeCompare(b.p));
+const sel=h('select',{},...(m.k==='f'?[h('option',{value:''},'Top level (All classes)')]:[]),...opts.map(o=>h('option',{value:o.id},o.p)));
+return h('div',{class:'card',style:'border-color:#f5a31a'},h('h3',{},'Move "'+(item.name||item.title||'')+'" to…'),sel,h('div',{class:'row'},
+h('button',{onclick:async()=>{if(!opts.length&&m.k!=='f')return alert('Create a folder first.');const x=await DB.get(store,m.id);if(m.k==='f')x.parent=sel.value||null;else x.folder=sel.value;await DB.put(store,x);MOVE=null;AF=sel.value||null;adminView();scrollTo(0,0)}},'Move here'),
+h('button',{class:'alt',onclick:()=>{MOVE=null;adminView()}},'Cancel')))}
